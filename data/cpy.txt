@@ -1,0 +1,260 @@
+package slagalica;
+
+import java.awt.Graphics2D;
+import java.awt.GridLayout;
+import java.awt.Image;
+import java.awt.MouseInfo;
+import java.awt.Point;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
+
+import javax.imageio.ImageIO;
+import javax.swing.Icon;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
+import javax.swing.WindowConstants;
+
+
+
+
+public class Slagalica extends JFrame{
+
+	
+	
+	
+	
+	Point btnCenters[] = new Point[100];
+	BufferedImage[] imgs = new BufferedImage[100];
+	Map <BufferedImage, Integer> imgMap = new HashMap<>();
+	
+	int selectedBtnIndex = -1;
+	int lazyNewHeight;
+	
+	Point mousePoint;
+	
+	Slagalica me;
+	SetupFrame parent;
+	
+	int setupCnt = 0;
+	
+	public Slagalica(/*SetupFrame parent, */int emptyInd, int DIMENSION, int TILE_SIZE, String IMAGE_PATH) { // DIMENSION = no of tiles
+		super("Slagalica");
+		lazyNewHeight = TILE_SIZE;
+		setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+		me = this;
+//		this.parent = parent;
+		setup(DIMENSION, TILE_SIZE, IMAGE_PATH); 
+		
+		paint(emptyInd, DIMENSION,TILE_SIZE, IMAGE_PATH);
+
+		addComponentListener(new ComponentAdapter() {
+		    public void componentResized(ComponentEvent componentEvent) {
+		    	lazyNewHeight = (int) me.getSize().getHeight();
+//		        System.out.println("new size is h=" + me.getSize().getHeight() + " w=" + me.getSize().getWidth());
+
+		    }
+		});
+		
+	}
+
+
+
+	private void paint(int emptyInd, int DIMENSION, int TILE_SIZE, String IMAGE_PATH) {
+//		if (selectedBtnIndex != -1) System.out.println("btn " + selectedBtnIndex + " goes to " + emptyInd);
+		System.out.printf("painting %d %d %d %s\n", emptyInd, DIMENSION, TILE_SIZE, IMAGE_PATH);
+		
+		JButton[] buttons = new JButton[100];
+
+		setLayout(new GridLayout(DIMENSION, DIMENSION));
+
+//		System.out.println(getLayout());
+		// java.awt.BorderLayout[hgap=0,vgap=0] bruh
+		
+//		System.out.println("dim * dim " + DIMENSION * DIMENSION);
+		
+		for (int i = 1;i <= DIMENSION * DIMENSION;i++) {
+			
+			if (i == emptyInd) {
+				JButton emptyButton = new JButton("");
+				buttons[emptyInd] = emptyButton;
+//				add(buttons[emptyInd]);
+				emptyButton.addActionListener(e -> {
+					me.setSize(lazyNewHeight, lazyNewHeight);
+					final int TILE_SIZE_COPY = lazyNewHeight / DIMENSION;
+					if (selectedBtnIndex == -1) {
+						System.out.println("no selection yet");
+						return;
+					}
+//					System.out.println("clicked");
+//					System.out.println("selected " + selectedBtnIndex);
+					if (Point.distance(btnCenters[emptyInd].getX(), btnCenters[emptyInd].getY(), btnCenters[selectedBtnIndex].getX(), btnCenters[selectedBtnIndex].getY()) - TILE_SIZE_COPY < 1) {
+
+						// swap icons
+						BufferedImage pom = imgs[emptyInd];
+						imgs[emptyInd] = imgs[selectedBtnIndex];
+						imgs[selectedBtnIndex] = pom;
+						
+						// switchTiles(selectedBtnIndex, emptyInd);
+						// selectedBtnIndex = new empty tile
+						System.out.println("painting in if");
+						paint(emptyInd, DIMENSION, TILE_SIZE_COPY, IMAGE_PATH);
+						
+					}
+					else {
+						System.out.println("too far");
+					}
+					
+				});
+			}
+			else {
+				buttons[i] = new JButton(Integer.toString(i));
+				final int iCopy = i; // final for listener
+				buttons[i].addActionListener(e -> {
+					me.setSize(lazyNewHeight, lazyNewHeight);
+					selectedBtnIndex = iCopy;
+					System.out.println("btn" + iCopy);
+				});
+				
+			}
+			System.out.println("adding");
+			add(buttons[i]);
+			
+		}
+		
+		setSize(TILE_SIZE*DIMENSION, TILE_SIZE*DIMENSION);
+		
+		// display tiles 
+		
+		for (int i = 1;i <= DIMENSION * DIMENSION;i++) {
+			
+			if (i == emptyInd) continue;
+
+			// resize image
+			
+			Image tmp = imgs[i].getScaledInstance(lazyNewHeight, lazyNewHeight, Image.SCALE_SMOOTH);
+			BufferedImage dimg = new BufferedImage(lazyNewHeight, lazyNewHeight, BufferedImage.TYPE_INT_ARGB);
+		    Graphics2D g2d = dimg.createGraphics();
+		    System.out.println("curr height is " + imgs[i].getHeight() + ", new h is " + lazyNewHeight);
+		    g2d.drawImage(tmp, 0, 0, null);
+		    
+		    // display image 
+		    
+		    buttons[i].setIcon(new ImageIcon(dimg));
+//		    buttons[i].setIcon(new ImageIcon(imgs[i]));
+		}
+		
+		// check if puzzle is solved
+		
+		int isDone = 1;
+		for (int i = 1; i <= DIMENSION * DIMENSION;i++) {
+			if (imgMap.get(imgs[i]) != i) {
+				isDone = 0; break;
+			}
+		}
+		if (isDone == 1) {
+			// resize the final tile
+			Image tmp = imgs[emptyInd].getScaledInstance(lazyNewHeight, lazyNewHeight, Image.SCALE_SMOOTH);
+			BufferedImage dimg = new BufferedImage(lazyNewHeight, lazyNewHeight, BufferedImage.TYPE_INT_ARGB);
+		    Graphics2D g2d = dimg.createGraphics();
+		    g2d.drawImage(tmp, 0, 0, null);
+		    
+		    //display it
+			buttons[emptyInd].setIcon(new ImageIcon(dimg));
+			
+			JOptionPane.showMessageDialog(me, "Congratulations! You have finished the puzzle.");
+			for (int i = 1;i <= DIMENSION * DIMENSION;i++) {
+				buttons[i].setEnabled(false);
+				// TODO promjeni ovo u display ciste slike
+			}
+		}
+		
+	}
+	
+
+
+	public static void main(String[] args) {
+		
+		
+		final int DEFAULT_DIMENSION = 2; // ako je paran, uvijek ce bit rijesivo https://en.wikipedia.org/wiki/15_puzzle
+		final int DEFAULT_TILE_SIZE = 1000/DEFAULT_DIMENSION;
+		final int DEFAULT_EMPTY = 4;
+		final String IMAGE_PATH = "data/hk.png";
+//		setup(DEFAULT_DIMENSION, DEFAULT_TILE_SIZE);
+		SwingUtilities.invokeLater(()->  new Slagalica(DEFAULT_EMPTY, DEFAULT_DIMENSION, DEFAULT_TILE_SIZE, IMAGE_PATH).setVisible(true));
+		
+		
+		
+	}
+
+
+
+	public void setup(int DIMENSION, int TILE_SIZE, String IMAGE_PATH) {
+		System.out.printf("usao u setup %d %d %s\n", DIMENSION, TILE_SIZE, IMAGE_PATH);
+
+/*		if (parent.getSetupCnt() != 0) {
+			return;
+		}
+		parent.setSetupCnt();
+*/		
+		// btnCenters 
+		
+		for (int i = 1;i <= DIMENSION * DIMENSION;i++) {
+			int row = (i - 1) / DIMENSION;
+			int col = (i - 1) % DIMENSION;
+			btnCenters[i] = new Point((int)((col + 0.5) * TILE_SIZE),(int)((row + 0.5) * TILE_SIZE)); // gridLayout ih stavlja kao j,i
+//					System.out.println("center of btn" + i + " is " + btnCenters[i]);
+		}
+		
+		// split image
+		
+		for (int i = 1;i <= DIMENSION * DIMENSION;i++) {
+			try {
+//				String path = "data/hk.png";
+				String path = IMAGE_PATH;
+				BufferedImage myPicture = ImageIO.read(new File(path));
+				int myH = myPicture.getHeight() / DIMENSION;
+				// TODO treba razdijeliti zastavu turske, a ne frame
+	//			System.out.println("picture height is " + myH);
+				int row = (i - 1) / DIMENSION;
+				int col = (i - 1) % DIMENSION;
+//				System.out.printf("button%d %d %d\n", i, col, row); // j,i
+//				System.out.printf("button%d %d %d %d %d\n", i, myH * col, myH * row, myH, myH);
+				BufferedImage splitImg = myPicture.getSubimage(myH * col, myH * row, myH, myH);
+				imgs[i] = splitImg;	
+				imgMap.put(splitImg, i);
+				
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		// shuffle = single swap
+		System.out.println("pozivam random");
+		for (;;) {
+			Random r = new Random();
+			int x = r.nextInt(DIMENSION * DIMENSION) + 1;
+			int y = r.nextInt(DIMENSION * DIMENSION) + 1;
+			if (x != y) {
+				// swap
+				BufferedImage pom = imgs[x];
+				imgs[x] = imgs[y];
+				imgs[y] = pom;
+				break;
+			}
+		}
+		
+	}
+
+	
+}
